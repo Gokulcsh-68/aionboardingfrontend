@@ -48,24 +48,46 @@ export async function startVoiceSession({ patient, category, language }) {
  */
 export async function sendVoiceTurn(sessionId, audioBlob = null, textFallback = null) {
   const formData = new FormData();
-  if (audioBlob) {
+  let hasData = false;
+
+  if (audioBlob && audioBlob.size > 0) {
     const filename = audioBlob.type.includes('wav') ? 'speech.wav' : 'speech.webm';
     formData.append('audio', audioBlob, filename);
+    hasData = true;
   }
   if (textFallback) {
     formData.append('text_fallback', textFallback);
+    hasData = true;
   }
 
-  const res = await fetch(`${API_BASE_URL}/v1/voice-onboarding/${sessionId}/turn`, {
-    method: 'POST',
-    body: formData,
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Failed to send voice turn: ${errText}`);
+  if (!hasData) {
+    throw new Error('No audio recording or text input provided');
   }
-  return await res.json();
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s timeout safeguard for serverless proxies
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/v1/voice-onboarding/${sessionId}/turn`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Server status ${res.status}: ${errText}`);
+    }
+    return await res.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out while processing speech turn.');
+    }
+    throw err;
+  }
 }
 
 /**
