@@ -24,10 +24,14 @@ export default function VoiceChat({
   const timerRef = useRef(null);
   const audioPlayerRef = useRef(new Audio());
   const chatBottomRef = useRef(null);
+
+  // VAD & Silence Detection Refs
+  const silenceAnimFrameRef = useRef(null);
+  const audioContextRef = useRef(null);
   const autoTalkRef = useRef(autoTalkMode);
   const isRecordingRef = useRef(isRecording);
 
-  // Keep refs in sync for event listeners
+  // Keep refs in sync for callbacks
   useEffect(() => {
     autoTalkRef.current = autoTalkMode;
   }, [autoTalkMode]);
@@ -35,6 +39,15 @@ export default function VoiceChat({
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
+
+  // Clean up AudioContext & timers on unmount
+  useEffect(() => {
+    return () => {
+      if (silenceAnimFrameRef.current) cancelAnimationFrame(silenceAnimFrameRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (audioContextRef.current) audioContextRef.current.close().catch(() => {});
+    };
+  }, []);
 
   // Audio Playback Listener setup
   useEffect(() => {
@@ -85,7 +98,7 @@ export default function VoiceChat({
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [turnHistory, isProcessingTurn, isPlayingAudio, isRecording]);
 
-  // Handle Audio Recording Start
+  // Handle Audio Recording Start with Web Audio API Voice Activity Detection (VAD)
   const startRecording = async () => {
     if (isRecordingRef.current) return;
     try {
@@ -94,6 +107,48 @@ export default function VoiceChat({
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
 
+      // Web Audio API VAD (Volume & Silence meter)
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      audioContextRef.current = audioCtx;
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      let hasSpoken = false;
+      let silenceStart = null;
+
+      const detectVoiceActivity = () => {
+        if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return;
+
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const avgVolume = sum / bufferLength;
+
+        // Speech detected (volume above threshold)
+        if (avgVolume > 10) {
+          hasSpoken = true;
+          silenceStart = null;
+        } else if (hasSpoken) {
+          // Patient has spoken and volume dropped to silence
+          if (!silenceStart) {
+            silenceStart = Date.now();
+          } else if (Date.now() - silenceStart > 1600) { // 1.6s continuous silence after speech
+            console.log('Silence detected after speech -> Auto-stopping and submitting recording');
+            stopRecording();
+            return;
+          }
+        }
+
+        silenceAnimFrameRef.current = requestAnimationFrame(detectVoiceActivity);
+      };
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
@@ -101,19 +156,34 @@ export default function VoiceChat({
       };
 
       mediaRecorder.onstop = async () => {
+        if (silenceAnimFrameRef.current) cancelAnimationFrame(silenceAnimFrameRef.current);
+        if (audioContextRef.current) {
+          audioContextRef.current.close().catch(() => {});
+        }
+
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         // Stop all audio tracks
         stream.getTracks().forEach((track) => track.stop());
+
         await processTurn(audioBlob, null);
       };
 
-      mediaRecorder.start();
+      mediaRecorder.start(200);
       setIsRecording(true);
       setRecordingTime(0);
       setStatusMessage('Listening for your response...');
 
+      detectVoiceActivity();
+
       timerRef.current = setInterval(() => {
-        setRecordingTime((prev) => prev + 1);
+        setRecordingTime((prev) => {
+          // Safeguard: auto-stop after 12 seconds if continuous speech
+          if (prev >= 12) {
+            stopRecording();
+            return prev;
+          }
+          return prev + 1;
+        });
       }, 1000);
     } catch (err) {
       console.warn('Microphone access unavailable or denied:', err);
@@ -123,10 +193,11 @@ export default function VoiceChat({
 
   // Handle Audio Recording Stop
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      clearInterval(timerRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (silenceAnimFrameRef.current) cancelAnimationFrame(silenceAnimFrameRef.current);
       setStatusMessage('Processing speech turn...');
     }
   };
@@ -238,10 +309,10 @@ export default function VoiceChat({
                     ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 shadow-sm'
                     : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
                 }`}
-                title="Continuous hands-free conversation (Auto-listen when AI stops talking)"
+                title="Continuous hands-free conversation (Auto-listen & auto-send on silence)"
               >
                 <Zap className={`h-3.5 w-3.5 ${autoTalkMode ? 'text-emerald-400 animate-pulse' : ''}`} />
-                <span>Hands-Free Auto-Talk: {autoTalkMode ? 'ON' : 'OFF'}</span>
+                <span>Silence VAD Auto-Send: {autoTalkMode ? 'ON' : 'OFF'}</span>
               </button>
             )}
 
@@ -281,7 +352,7 @@ export default function VoiceChat({
             ) : isRecording ? (
               <div className="flex items-center space-x-2 text-rose-400">
                 <Radio className="h-4 w-4 animate-pulse" />
-                <span className="font-semibold">Microphone Active — Speak Now ({recordingTime}s)</span>
+                <span className="font-semibold">Microphone Active — Speak Now ({recordingTime}s, auto-sends when you pause)</span>
               </div>
             ) : isProcessingTurn ? (
               <div className="flex items-center space-x-2 text-indigo-400">
@@ -401,12 +472,12 @@ export default function VoiceChat({
                     {isRecording
                       ? `Recording Speech... (${recordingTime}s)`
                       : autoTalkMode
-                      ? 'Hands-Free Auto-Talk Active (Mic opens when AI stops talking)'
+                      ? 'Auto-Silence VAD Active (Mic sends audio automatically when you pause speaking)'
                       : 'Tap Microphone to Speak'}
                   </div>
                   <div className="text-[11px] text-slate-400">
                     {isRecording
-                      ? 'Tap again or wait to stop and auto-submit turn'
+                      ? 'Speak your symptoms — audio will auto-send after 1.6s of silence'
                       : 'Sarvam AI multi-model Indic speech recognition'}
                   </div>
                 </div>
