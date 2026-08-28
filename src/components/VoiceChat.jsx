@@ -323,7 +323,7 @@ export default function VoiceChat({
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                Specialty: <span className="text-cyan-400 font-semibold">{session?.category?.name || 'General'}</span>
+                Specialty: <span className="text-cyan-400 font-semibold">{typeof session?.category === 'string' ? session.category : session?.category?.name || session?.category?.code || 'Cardiology'}</span>
               </p>
             </div>
           </div>

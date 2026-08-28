@@ -53,7 +53,7 @@ export default function PatientSetupForm({ onStartSession, isLoading }) {
       const gender = params.get('gender');
       const abha_id = params.get('abha_id') || params.get('abha');
       const phone = params.get('phone') || params.get('mobile');
-      const specCode = params.get('category') || params.get('specialty');
+      const specCode = (params.get('category') || params.get('specialty') || params.get('speciality') || params.get('spec') || '').toLowerCase().trim();
       const langCode = params.get('language') || params.get('lang');
       const modeParam = params.get('mode');
       const autoStart = params.get('auto_start') === 'true' || params.get('autostart') === '1';
@@ -75,9 +75,15 @@ export default function PatientSetupForm({ onStartSession, isLoading }) {
 
         setPatient(injectedPatient);
 
-        let initialCategory = CLINICAL_SPECIALTIES[1];
+        let initialCategory = CLINICAL_SPECIALTIES[1]; // Default Cardiology
         if (specCode) {
-          const match = CLINICAL_SPECIALTIES.find((s) => s.code === specCode || s.name.toLowerCase().includes(specCode.toLowerCase()));
+          const match = CLINICAL_SPECIALTIES.find(
+            (s) =>
+              s.code.toLowerCase() === specCode ||
+              s.code.toLowerCase().includes(specCode) ||
+              specCode.includes(s.code.toLowerCase()) ||
+              s.name.toLowerCase().includes(specCode)
+          );
           if (match) {
             initialCategory = match;
             setCategory(match);
@@ -118,8 +124,17 @@ export default function PatientSetupForm({ onStartSession, isLoading }) {
         setPatient(injectedPatient);
 
         let selCat = category;
-        if (event.data.category) {
-          const match = CLINICAL_SPECIALTIES.find((s) => s.code === event.data.category?.code || s.code === event.data.category);
+        if (event.data.category || event.data.specialty) {
+          const catVal = (typeof event.data.category === 'string'
+            ? event.data.category
+            : event.data.category?.code || event.data.category?.name || event.data.specialty || '').toLowerCase().trim();
+          const match = CLINICAL_SPECIALTIES.find(
+            (s) =>
+              s.code.toLowerCase() === catVal ||
+              s.code.toLowerCase().includes(catVal) ||
+              catVal.includes(s.code.toLowerCase()) ||
+              s.name.toLowerCase().includes(catVal)
+          );
           if (match) {
             selCat = match;
             setCategory(match);
