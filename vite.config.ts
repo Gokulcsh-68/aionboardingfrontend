@@ -8,15 +8,11 @@ export default defineConfig({
     port: 3000,
     host: true,
     proxy: {
-      '/v1': {
+      '/api': {
         target: 'https://services-api.a2zhealth.in/onboarding',
         changeOrigin: true,
         secure: false,
-      },
-      '/onboarding-audio': {
-        target: 'https://services-api.a2zhealth.in/onboarding',
-        changeOrigin: true,
-        secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

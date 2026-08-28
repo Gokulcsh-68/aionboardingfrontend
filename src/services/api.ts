@@ -1,7 +1,7 @@
 import { CategoryInfo, PatientInfo, VoiceTurnResult } from "../types/voice";
 import { DocumentExtractionResult, PatientOnboardingResult } from "../types/onboarding";
 
-const API_BASE_URL = "https://services-api.a2zhealth.in/onboarding";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
 export async function startVoiceOnboarding(
   patient: PatientInfo,

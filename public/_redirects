@@ -1,0 +1,2 @@
+/api/*  https://services-api.a2zhealth.in/onboarding/:splat  200!
+/*      /index.html                                          200
