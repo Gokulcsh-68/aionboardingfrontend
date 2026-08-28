@@ -9,12 +9,12 @@ export default defineConfig({
     host: true,
     proxy: {
       '/v1': {
-        target: 'https://services-api.a2zhealth.in/onboarding',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
       '/health': {
-        target: 'https://services-api.a2zhealth.in/onboarding',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },

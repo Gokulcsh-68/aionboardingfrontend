@@ -161,7 +161,13 @@ export async function completeSession(sessionId, confirmed = false, isVoice = tr
     const errText = await res.text();
     throw new Error(`Failed to complete onboarding session: ${errText}`);
   }
-  return await res.json();
+  const result = await res.json();
+
+  if (confirmed) {
+    emitToParentWindow('ONBOARDING_COMPLETED', result);
+  }
+
+  return result;
 }
 
 /**
@@ -173,4 +179,42 @@ export function resolveAudioUrl(audioUrl) {
     return audioUrl;
   }
   return `${API_BASE_URL}${audioUrl}`;
+}
+
+/**
+ * Unified helper to emit data back to Parent App (WebView / iFrame / React Native / Flutter)
+ */
+export function emitToParentWindow(eventType, data) {
+  const payload = {
+    type: eventType,
+    source: 'CURESELECT_ONBOARDING_APP',
+    timestamp: new Date().toISOString(),
+    data,
+  };
+
+  try {
+    // Channel 1: Web iFrame parent
+    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      window.parent.postMessage(payload, '*');
+    }
+
+    // Channel 2: React Native WebView
+    if (typeof window !== 'undefined' && window.ReactNativeWebView && typeof window.ReactNativeWebView.postMessage === 'function') {
+      window.ReactNativeWebView.postMessage(JSON.stringify(payload));
+    }
+
+    // Channel 3: Android Native JavaScript Interface
+    if (typeof window !== 'undefined' && window.AndroidBridge && typeof window.AndroidBridge.postMessage === 'function') {
+      window.AndroidBridge.postMessage(JSON.stringify(payload));
+    }
+
+    // Channel 4: iOS WKWebView MessageHandler
+    if (typeof window !== 'undefined' && window.webkit?.messageHandlers?.onboardingBridge) {
+      window.webkit.messageHandlers.onboardingBridge.postMessage(payload);
+    }
+  } catch (e) {
+    console.warn('Bridge emission error:', e);
+  }
+
+  console.log(`[WebView Bridge Emitted ${eventType}]:`, payload);
 }

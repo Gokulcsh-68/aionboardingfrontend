@@ -43,6 +43,105 @@ export default function PatientSetupForm({ onStartSession, isLoading }) {
   const [language, setLanguage] = useState('en-IN');
   const [mode, setMode] = useState('voice'); // 'voice' or 'text'
 
+  // WebView Data Injection Listener (URL query parameters & postMessage bridge)
+  useEffect(() => {
+    // 1. URL Query Parameter Injection
+    if (typeof window !== 'undefined' && window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const name = params.get('name') || params.get('patient_name');
+      const age = params.get('age');
+      const gender = params.get('gender');
+      const abha_id = params.get('abha_id') || params.get('abha');
+      const phone = params.get('phone') || params.get('mobile');
+      const specCode = params.get('category') || params.get('specialty');
+      const langCode = params.get('language') || params.get('lang');
+      const modeParam = params.get('mode');
+      const autoStart = params.get('auto_start') === 'true' || params.get('autostart') === '1';
+
+      if (name || age || gender || phone || specCode || langCode) {
+        const parts = (name || 'Patient').trim().split(' ');
+        const injectedPatient = {
+          id: params.get('id') || params.get('patient_id') || `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
+          name: name || 'Arun Kumar',
+          first_name: parts[0] || name || 'Arun',
+          last_name: parts.slice(1).join(' ') || '',
+          age: parseInt(age) || 42,
+          gender: gender || 'male',
+          abha_id: abha_id || '91-1234-5678-9012',
+          phone: phone || '+91 98765 43210',
+          insurance_scheme: params.get('insurance') || 'PM-JAY',
+          dietary_habits: params.get('diet') || 'Vegetarian',
+        };
+
+        setPatient(injectedPatient);
+
+        let initialCategory = CLINICAL_SPECIALTIES[1];
+        if (specCode) {
+          const match = CLINICAL_SPECIALTIES.find((s) => s.code === specCode || s.name.toLowerCase().includes(specCode.toLowerCase()));
+          if (match) {
+            initialCategory = match;
+            setCategory(match);
+          }
+        }
+
+        if (langCode) setLanguage(langCode);
+        if (modeParam === 'voice' || modeParam === 'text') setMode(modeParam);
+
+        if (autoStart) {
+          onStartSession({
+            patient: injectedPatient,
+            category: initialCategory,
+            language: langCode || 'en-IN',
+            mode: modeParam || 'voice',
+          });
+        }
+      }
+    }
+
+    // 2. Window postMessage Event Injection
+    const handlePostMessage = (event) => {
+      if ((event.data?.type === 'INJECT_PATIENT_DATA' || event.data?.type === 'START_ONBOARDING') && event.data.patient) {
+        const pData = event.data.patient;
+        const parts = (pData.name || '').trim().split(' ');
+        const injectedPatient = {
+          id: pData.id || `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
+          name: pData.name || 'Arun Kumar',
+          first_name: pData.first_name || parts[0] || 'Arun',
+          last_name: pData.last_name || parts.slice(1).join(' ') || '',
+          age: parseInt(pData.age) || 42,
+          gender: pData.gender || 'male',
+          abha_id: pData.abha_id || '91-1234-5678-9012',
+          phone: pData.phone || '+91 98765 43210',
+          insurance_scheme: pData.insurance_scheme || 'PM-JAY',
+          dietary_habits: pData.dietary_habits || 'Vegetarian',
+        };
+        setPatient(injectedPatient);
+
+        let selCat = category;
+        if (event.data.category) {
+          const match = CLINICAL_SPECIALTIES.find((s) => s.code === event.data.category?.code || s.code === event.data.category);
+          if (match) {
+            selCat = match;
+            setCategory(match);
+          }
+        }
+
+        const selLang = event.data.language || language;
+        const selMode = event.data.mode || mode;
+
+        if (event.data.language) setLanguage(event.data.language);
+        if (event.data.mode) setMode(event.data.mode);
+
+        if (event.data.autoStart || event.data.type === 'START_ONBOARDING') {
+          onStartSession({ patient: injectedPatient, category: selCat, language: selLang, mode: selMode });
+        }
+      }
+    };
+
+    window.addEventListener('message', handlePostMessage);
+    return () => window.removeEventListener('message', handlePostMessage);
+  }, []);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     onStartSession({ patient, category, language, mode });
