@@ -11,7 +11,7 @@ export function useAudioRecorder({
   onAudioCaptured,
   language = "ta-IN",
   maxDurationSeconds = 5.0,
-  silenceThresholdSeconds = 0.9,
+  silenceThresholdSeconds = 0.4,
 }: UseAudioRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);

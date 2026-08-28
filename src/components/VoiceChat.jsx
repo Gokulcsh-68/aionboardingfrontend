@@ -77,7 +77,7 @@ export default function VoiceChat({
         setStatusMessage('Auto-listening...');
         setTimeout(() => {
           startRecording();
-        }, 500);
+        }, 100);
       }
     };
 
@@ -154,7 +154,7 @@ export default function VoiceChat({
           // Patient has spoken and volume dropped to silence
           if (!silenceStart) {
             silenceStart = Date.now();
-          } else if (Date.now() - silenceStart > 1600) { // 1.6s continuous silence after speech
+          } else if (Date.now() - silenceStart > 400) { // 1.6s continuous silence after speech
             console.log('Silence detected after speech -> Auto-stopping and submitting recording');
             stopRecording();
             return;

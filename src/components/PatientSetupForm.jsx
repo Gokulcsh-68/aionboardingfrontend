@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, HeartPulse, Languages, Shield, Phone, Sparkles, ArrowRight, Mic, MessageSquare } from 'lucide-react';
 
 const CLINICAL_SPECIALTIES = [
