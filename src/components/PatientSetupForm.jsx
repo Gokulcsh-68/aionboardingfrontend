@@ -140,6 +140,7 @@ export default function PatientSetupForm({ onSubmit, isLoading }) {
       },
       category: formData.category,
       language: formData.language,
+      mode: 'voice',
     });
   };
 

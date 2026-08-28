@@ -39,7 +39,7 @@ export default function App() {
   // Handle Session Initialization (Start Voice / Text Session)
   const handleStartSession = async ({ patient, category, language, mode }) => {
     setIsLoadingSession(true);
-    const useVoice = mode === 'voice';
+    const useVoice = mode ? mode === 'voice' : true;
     setIsVoiceMode(useVoice);
 
     try {
@@ -53,12 +53,13 @@ export default function App() {
       setActiveSession({
         ...sessionRes,
         patient,
-        category,
-        language,
+        category: sessionRes?.category || category,
+        language: sessionRes?.language || language,
+        greeting_text: sessionRes?.greeting_text || `Hello ${patient.first_name || patient.name || 'Patient'}, welcome to CureSelect Healthcare. I am your AI clinical assistant. What symptoms or medical concerns bring you in today?`,
       });
     } catch (err) {
       console.error('Failed to start session:', err);
-      // Fallback mock session if backend server is starting or unreachable
+      // Fallback mock session if backend server is unreachable
       setActiveSession({
         success: true,
         session_id: `VOICE-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
@@ -66,11 +67,10 @@ export default function App() {
         patient,
         category,
         language,
+        greeting_text: `Hello ${patient.first_name || patient.name || 'Patient'}, welcome to CureSelect Healthcare. I am your AI clinical assistant. What symptoms or medical concerns bring you in today?`,
         status: 'in_progress',
         stage: 'greeting',
-        greeting_text: `Hello ${patient.name}, welcome to CureSelect ${category.name} department. What symptoms or discomfort are you experiencing today?`,
-        greeting_message: `Hello ${patient.name}, welcome to CureSelect ${category.name} department. What symptoms or discomfort are you experiencing today?`,
-        audio_url: null,
+        completed: false,
       });
     } finally {
       setIsLoadingSession(false);
