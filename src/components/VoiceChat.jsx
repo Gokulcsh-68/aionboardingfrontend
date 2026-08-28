@@ -77,7 +77,7 @@ export default function VoiceChat({
         setStatusMessage('Auto-listening...');
         setTimeout(() => {
           startRecording();
-        }, 100);
+        }, 500);
       }
     };
 
@@ -154,7 +154,7 @@ export default function VoiceChat({
           // Patient has spoken and volume dropped to silence
           if (!silenceStart) {
             silenceStart = Date.now();
-          } else if (Date.now() - silenceStart > 400) { // 1.6s continuous silence after speech
+          } else if (Date.now() - silenceStart > 1600) { // 1.6s continuous silence after speech
             console.log('Silence detected after speech -> Auto-stopping and submitting recording');
             stopRecording();
             return;
@@ -272,9 +272,13 @@ export default function VoiceChat({
     processTurn(null, textInput.trim());
   };
 
-  // Audio Playback Handler
-  const playAudio = (audioUrl) => {
-    const fullUrl = resolveAudioUrl(audioUrl);
+  // Audio Playback Handler with User Base64 fallback support
+  const playAudio = (audioUrlOrBase64) => {
+    let fullUrl = audioUrlOrBase64;
+    if (!fullUrl) return;
+    if (!fullUrl.startsWith('data:audio')) {
+      fullUrl = resolveAudioUrl(fullUrl);
+    }
     if (!fullUrl) return;
 
     try {
@@ -300,30 +304,30 @@ export default function VoiceChat({
 
   return (
     <div className="max-w-5xl mx-auto my-6 px-4">
-      <div className="glass-card rounded-2xl border border-slate-800 shadow-2xl flex flex-col h-[720px] relative overflow-hidden">
+      <div className="glass-card rounded-3xl border border-slate-200/90 shadow-2xl bg-white/95 flex flex-col h-[720px] relative overflow-hidden">
         
         {/* Chat Header Bar */}
-        <div className="p-4 border-b border-slate-800/80 bg-slate-900/60 flex items-center justify-between">
+        <div className="p-4 border-b border-slate-200/80 bg-white/90 backdrop-blur-md flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-sky-500 flex items-center justify-center text-slate-950 font-bold">
+            <div className="h-10 w-10 rounded-2xl bg-gradient-to-tr from-cyan-500 via-sky-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-md shadow-cyan-500/20">
               <Bot className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
-                <span className="font-bold text-sm text-slate-100">
+                <span className="font-extrabold text-sm text-slate-900">
                   {session?.patient?.name || 'Patient'} Onboarding Assistant
                 </span>
-                <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded-md bg-cyan-100 text-cyan-900 border border-cyan-200">
                   {session?.language || 'en-IN'}
                 </span>
                 {isCompleted && (
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  <span className="px-2.5 py-0.5 text-[10px] font-extrabold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
                     Session Completed
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400">
-                Specialty: <span className="text-cyan-400 font-semibold">{typeof session?.category === 'string' ? session.category : session?.category?.name || session?.category?.code || 'Cardiology'}</span>
+              <p className="text-xs text-slate-500 font-medium">
+                Specialty: <span className="text-cyan-700 font-bold">{typeof session?.category === 'string' ? session.category : session?.category?.name || session?.category?.code || 'Cardiology'}</span>
               </p>
             </div>
           </div>
@@ -333,17 +337,17 @@ export default function VoiceChat({
             {!isCompleted && (
               <button
                 onClick={() => setViewMode(viewMode === 'audio_only' ? 'transcript' : 'audio_only')}
-                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 flex items-center space-x-1.5 transition-all"
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-bold text-slate-700 flex items-center space-x-1.5 transition-all shadow-sm"
                 title="Toggle between Voice Call mode and Full Text Transcript"
               >
                 {viewMode === 'audio_only' ? (
                   <>
-                    <MessageSquare className="h-3.5 w-3.5 text-cyan-400" />
+                    <MessageSquare className="h-3.5 w-3.5 text-cyan-600" />
                     <span>Show Transcript</span>
                   </>
                 ) : (
                   <>
-                    <Volume className="h-3.5 w-3.5 text-cyan-400" />
+                    <Volume className="h-3.5 w-3.5 text-cyan-600" />
                     <span>Audio Only View</span>
                   </>
                 )}
@@ -354,14 +358,14 @@ export default function VoiceChat({
             {isVoiceMode && !isCompleted && (
               <button
                 onClick={() => setAutoTalkMode(!autoTalkMode)}
-                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                className={`px-3 py-1.5 rounded-xl border text-xs font-extrabold flex items-center space-x-1.5 transition-all shadow-sm ${
                   autoTalkMode
-                    ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 shadow-sm'
-                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                    : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-slate-800'
                 }`}
                 title="Continuous hands-free conversation (Auto-listen & auto-send on silence)"
               >
-                <Zap className={`h-3.5 w-3.5 ${autoTalkMode ? 'text-emerald-400 animate-pulse' : ''}`} />
+                <Zap className={`h-3.5 w-3.5 ${autoTalkMode ? 'text-emerald-600 animate-pulse' : ''}`} />
                 <span>Hands-Free Auto-Talk: {autoTalkMode ? 'ON' : 'OFF'}</span>
               </button>
             )}
@@ -369,12 +373,12 @@ export default function VoiceChat({
             {/* Document Uploader Trigger */}
             <button
               onClick={onOpenDocumentUploader}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center space-x-1.5 transition-all"
+              className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-xs font-bold text-slate-800 flex items-center space-x-1.5 transition-all shadow-sm"
             >
-              <FileText className="h-3.5 w-3.5 text-cyan-400" />
+              <FileText className="h-3.5 w-3.5 text-cyan-600" />
               <span>Prescription OCR</span>
               {documentsCount > 0 && (
-                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-cyan-500 text-slate-950 font-mono text-[10px]">
+                <span className="ml-1 px-1.5 py-0.2 rounded-full bg-cyan-600 text-white font-mono text-[10px]">
                   {documentsCount}
                 </span>
               )}
@@ -383,7 +387,7 @@ export default function VoiceChat({
             {/* Complete & Confirm Session Button */}
             <button
               onClick={() => onCompleteSession(false)}
-              className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-extrabold flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20 transition-all"
+              className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 text-white text-xs font-extrabold flex items-center space-x-1.5 shadow-md shadow-emerald-500/20 transition-all"
             >
               <CheckCircle2 className="h-4 w-4" />
               <span>Review & Submit EHR</span>
@@ -392,54 +396,54 @@ export default function VoiceChat({
         </div>
 
         {/* Dynamic Voice Activity Bar */}
-        <div className="px-4 py-2 bg-slate-950/60 border-b border-slate-900 flex items-center justify-between text-xs">
+        <div className="px-4 py-2 bg-sky-50/80 border-b border-sky-100 flex items-center justify-between text-xs">
           <div className="flex items-center space-x-2">
             {isCompleted ? (
-              <div className="flex items-center space-x-2 text-emerald-400 font-semibold">
-                <CheckCircle2 className="h-4 w-4" />
+              <div className="flex items-center space-x-2 text-emerald-800 font-extrabold">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 <span>Onboarding Completed — Ready for EHR Submission</span>
               </div>
             ) : isPlayingAudio ? (
-              <div className="flex items-center space-x-2 text-cyan-400">
-                <Volume2 className="h-4 w-4 animate-bounce" />
-                <span className="font-semibold">AI Assistant Speaking...</span>
+              <div className="flex items-center space-x-2 text-cyan-800 font-bold">
+                <Volume2 className="h-4 w-4 text-cyan-600 animate-bounce" />
+                <span>AI Assistant Speaking...</span>
               </div>
             ) : isRecording ? (
-              <div className="flex items-center space-x-2 text-rose-400">
-                <Radio className="h-4 w-4 animate-pulse" />
-                <span className="font-semibold">Microphone Active — Speak Now ({recordingTime}s)</span>
+              <div className="flex items-center space-x-2 text-rose-700 font-bold">
+                <Radio className="h-4 w-4 text-rose-600 animate-pulse" />
+                <span>Microphone Active — Speak Now ({recordingTime}s)</span>
               </div>
             ) : isProcessingTurn ? (
-              <div className="flex items-center space-x-2 text-indigo-400">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="font-semibold">Analyzing Symptoms & Synthesizing Reply...</span>
+              <div className="flex items-center space-x-2 text-indigo-800 font-bold">
+                <Loader2 className="h-4 w-4 text-indigo-600 animate-spin" />
+                <span>Analyzing Symptoms & Synthesizing Reply...</span>
               </div>
             ) : (
-              <div className="flex items-center space-x-2 text-slate-400">
-                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+              <div className="flex items-center space-x-2 text-slate-600 font-medium">
+                <Sparkles className="h-3.5 w-3.5 text-cyan-600" />
                 <span>Ready for turn</span>
               </div>
             )}
           </div>
 
-          <div className="text-[11px] font-mono text-slate-400">
-            Session: <span className="text-cyan-300">{session?.session_id}</span>
+          <div className="text-[11px] font-mono text-slate-500 font-semibold">
+            Session: <span className="text-cyan-900 font-bold">{session?.session_id}</span>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col justify-center items-center">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col justify-center items-center bg-gradient-to-b from-slate-50/50 via-white to-sky-50/30">
           
           {/* VIEW A: Completed Session Screen (Shows ONLY Review Button) */}
           {isCompleted ? (
-            <div className="my-auto text-center max-w-lg p-8 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shadow-2xl space-y-6">
-              <div className="h-20 w-20 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/40 shadow-xl shadow-emerald-500/10">
+            <div className="my-auto text-center max-w-lg p-8 rounded-3xl bg-white border border-emerald-200 shadow-2xl space-y-6">
+              <div className="h-20 w-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto border border-emerald-200 shadow-xl shadow-emerald-500/10">
                 <CheckCircle2 className="h-10 w-10" />
               </div>
               <div>
-                <h3 className="text-2xl font-extrabold text-slate-100">Patient Intake Completed</h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  All clinical symptoms, medical history, and prescription findings have been gathered for <span className="text-cyan-300 font-bold">{session?.patient?.name}</span>.
+                <h3 className="text-2xl font-extrabold text-slate-900">Patient Intake Completed</h3>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed font-medium">
+                  All clinical symptoms, medical history, and prescription findings have been gathered for <span className="text-cyan-800 font-bold">{session?.patient?.name}</span>.
                 </p>
               </div>
 
@@ -447,7 +451,7 @@ export default function VoiceChat({
               <div className="pt-4">
                 <button
                   onClick={() => onCompleteSession(false)}
-                  className="w-full py-4 px-6 rounded-xl text-sm font-extrabold text-slate-950 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 shadow-2xl shadow-emerald-500/30 flex items-center justify-center space-x-2 transition-all transform active:scale-95"
+                  className="w-full py-4 px-6 rounded-2xl text-sm font-extrabold text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 hover:from-emerald-600 hover:to-cyan-700 shadow-xl shadow-emerald-500/25 flex items-center justify-center space-x-2 transition-all transform active:scale-95 cursor-pointer"
                 >
                   <CheckCircle2 className="h-5 w-5" />
                   <span>Review Clinical Report & Confirm EHR Submission</span>
@@ -463,23 +467,23 @@ export default function VoiceChat({
                 <div
                   className={`w-40 h-40 rounded-full flex items-center justify-center transition-all duration-500 ${
                     isPlayingAudio
-                      ? 'bg-gradient-to-tr from-cyan-500 via-sky-400 to-indigo-500 animate-pulse shadow-2xl shadow-cyan-500/50 scale-105'
+                      ? 'bg-gradient-to-tr from-cyan-400 via-sky-400 to-indigo-600 animate-pulse shadow-2xl shadow-cyan-500/40 scale-105'
                       : isRecording
-                      ? 'bg-gradient-to-tr from-rose-500 via-pink-500 to-red-500 animate-pulse shadow-2xl shadow-rose-500/50 scale-105'
+                      ? 'bg-gradient-to-tr from-rose-500 via-pink-500 to-red-600 animate-pulse shadow-2xl shadow-rose-500/40 scale-105'
                       : isProcessingTurn
-                      ? 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-sky-500 animate-spin shadow-2xl shadow-indigo-500/50'
-                      : 'bg-slate-900 border-2 border-slate-700 shadow-xl'
+                      ? 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-sky-500 animate-spin shadow-2xl shadow-indigo-500/40'
+                      : 'bg-white border-4 border-slate-200 shadow-xl'
                   }`}
                 >
-                  <div className="w-32 h-32 rounded-full bg-slate-950/90 flex items-center justify-center">
+                  <div className="w-32 h-32 rounded-full bg-white flex items-center justify-center shadow-inner">
                     {isPlayingAudio ? (
-                      <Volume2 className="h-12 w-12 text-cyan-400 animate-bounce" />
+                      <Volume2 className="h-12 w-12 text-cyan-600 animate-bounce" />
                     ) : isRecording ? (
-                      <Mic className="h-12 w-12 text-rose-400 animate-pulse" />
+                      <Mic className="h-12 w-12 text-rose-500 animate-pulse" />
                     ) : isProcessingTurn ? (
-                      <Loader2 className="h-12 w-12 text-indigo-400 animate-spin" />
+                      <Loader2 className="h-12 w-12 text-indigo-600 animate-spin" />
                     ) : (
-                      <Bot className="h-12 w-12 text-cyan-400" />
+                      <Bot className="h-12 w-12 text-cyan-600" />
                     )}
                   </div>
                 </div>
@@ -487,15 +491,15 @@ export default function VoiceChat({
                 {/* Animated Ripple Waves */}
                 {(isPlayingAudio || isRecording) && (
                   <>
-                    <div className="absolute inset-0 rounded-full border-2 border-cyan-400/40 animate-ping" />
-                    <div className="absolute -inset-4 rounded-full border border-cyan-400/20 animate-pulse" />
+                    <div className="absolute inset-0 rounded-full border-2 border-cyan-400/50 animate-ping" />
+                    <div className="absolute -inset-4 rounded-full border border-cyan-400/30 animate-pulse" />
                   </>
                 )}
               </div>
 
               {/* Status Header */}
               <div>
-                <div className="text-lg font-extrabold text-slate-100">
+                <div className="text-xl font-extrabold text-slate-900">
                   {isPlayingAudio
                     ? 'AI Doctor Speaking...'
                     : isRecording
@@ -504,7 +508,7 @@ export default function VoiceChat({
                     ? 'Thinking & Processing...'
                     : 'Voice Onboarding Call'}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 max-w-md">
+                <p className="text-xs text-slate-600 mt-1 max-w-md font-medium">
                   {isPlayingAudio
                     ? 'Listen to spoken instructions via audio output'
                     : isRecording
@@ -515,23 +519,23 @@ export default function VoiceChat({
 
               {/* Spoken AI Audio Controls */}
               {lastAiTurn && (
-                <div className="w-full bg-slate-900/80 p-4 rounded-2xl border border-slate-800 space-y-2 text-left">
+                <div className="w-full bg-white p-5 rounded-3xl border border-slate-200/90 shadow-lg space-y-2 text-left">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-cyan-400 flex items-center space-x-1.5">
-                      <Bot className="h-4 w-4" />
+                    <span className="font-extrabold text-cyan-800 flex items-center space-x-1.5">
+                      <Bot className="h-4 w-4 text-cyan-600" />
                       <span>Current AI Question:</span>
                     </span>
                     {lastAiTurn.audioUrl && (
                       <button
                         onClick={() => (isPlayingAudio ? stopAudio() : playAudio(lastAiTurn.audioUrl))}
-                        className="px-2.5 py-1 rounded-lg bg-cyan-950 border border-cyan-500/30 text-cyan-300 font-semibold text-[11px] flex items-center space-x-1"
+                        className="px-3 py-1 rounded-xl bg-cyan-50 hover:bg-cyan-100 border border-cyan-200 text-cyan-900 font-bold text-[11px] flex items-center space-x-1 shadow-sm transition-all"
                       >
-                        {isPlayingAudio ? <VolumeX className="h-3.5 w-3.5 text-rose-400" /> : <Volume2 className="h-3.5 w-3.5 text-cyan-400" />}
+                        {isPlayingAudio ? <VolumeX className="h-3.5 w-3.5 text-rose-600" /> : <Volume2 className="h-3.5 w-3.5 text-cyan-600" />}
                         <span>{isPlayingAudio ? 'Pause Voice' : 'Replay Voice'}</span>
                       </button>
                     )}
                   </div>
-                  <p className="text-sm text-slate-200 leading-relaxed font-medium">"{lastAiTurn.text}"</p>
+                  <p className="text-sm text-slate-900 leading-relaxed font-semibold">"{lastAiTurn.text}"</p>
                 </div>
               )}
             </div>
@@ -546,43 +550,43 @@ export default function VoiceChat({
                     className={`flex items-start space-x-3 ${isAI ? 'justify-start' : 'justify-end'}`}
                   >
                     {isAI && (
-                      <div className="h-8 w-8 rounded-lg bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0 mt-1">
-                        <Bot className="h-4 w-4" />
+                      <div className="h-9 w-9 rounded-2xl bg-cyan-100 border border-cyan-200 flex items-center justify-center text-cyan-700 shrink-0 mt-1 shadow-sm">
+                        <Bot className="h-5 w-5" />
                       </div>
                     )}
 
                     <div
-                      className={`max-w-xl rounded-2xl p-4 text-sm leading-relaxed shadow-lg ${
+                      className={`max-w-xl rounded-3xl p-4 text-sm leading-relaxed shadow-md ${
                         isAI
-                          ? 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none'
-                          : 'bg-gradient-to-r from-cyan-600 to-sky-600 text-slate-950 font-medium rounded-tr-none'
+                          ? 'bg-white border border-slate-200/90 text-slate-900 rounded-tl-none'
+                          : 'bg-gradient-to-r from-cyan-600 to-indigo-600 text-white font-medium rounded-tr-none shadow-cyan-500/20'
                       }`}
                     >
                       {turn.patientTranscript && (
-                        <div className="mb-2 text-xs italic text-cyan-400 bg-slate-950/60 p-2 rounded-lg border border-cyan-500/20">
-                          <span className="font-bold">Recognized Patient Speech:</span> "{turn.patientTranscript}"
+                        <div className="mb-2 text-xs italic text-cyan-900 bg-cyan-50 p-2.5 rounded-xl border border-cyan-200 font-medium">
+                          <span className="font-bold text-cyan-950">Recognized Patient Speech:</span> "{turn.patientTranscript}"
                         </div>
                       )}
 
-                      <p>{turn.text}</p>
+                      <p className="font-medium">{turn.text}</p>
 
-                      <div className="mt-2 flex items-center justify-between text-[10px] opacity-75">
+                      <div className="mt-2 flex items-center justify-between text-[10px] opacity-80 font-medium">
                         <span>{turn.timestamp}</span>
 
                         {/* Audio Playback Button for AI Responses */}
                         {isAI && turn.audioUrl && (
                           <button
                             onClick={() => (isPlayingAudio ? stopAudio() : playAudio(turn.audioUrl))}
-                            className="ml-2 px-2 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-cyan-300 flex items-center space-x-1 transition-all"
+                            className="ml-2 px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 border border-sky-200 text-sky-900 flex items-center space-x-1 transition-all font-bold"
                           >
                             {isPlayingAudio ? (
                               <>
-                                <VolumeX className="h-3 w-3 text-rose-400" />
+                                <VolumeX className="h-3 w-3 text-rose-600" />
                                 <span>Pause Audio</span>
                               </>
                             ) : (
                               <>
-                                <Volume2 className="h-3 w-3 text-cyan-400" />
+                                <Volume2 className="h-3 w-3 text-cyan-600" />
                                 <span>Replay Audio</span>
                               </>
                             )}
@@ -592,8 +596,8 @@ export default function VoiceChat({
                     </div>
 
                     {!isAI && (
-                      <div className="h-8 w-8 rounded-lg bg-sky-500 flex items-center justify-center text-slate-950 font-bold shrink-0 mt-1">
-                        <User className="h-4 w-4" />
+                      <div className="h-9 w-9 rounded-2xl bg-gradient-to-tr from-cyan-600 to-indigo-600 flex items-center justify-center text-white font-bold shrink-0 mt-1 shadow-md">
+                        <User className="h-5 w-5" />
                       </div>
                     )}
                   </div>
@@ -601,8 +605,8 @@ export default function VoiceChat({
               })}
 
               {isProcessingTurn && (
-                <div className="flex items-center space-x-3 text-slate-400 text-xs py-2 px-4 bg-slate-900/50 rounded-xl w-max border border-slate-800">
-                  <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                <div className="flex items-center space-x-3 text-slate-600 text-xs py-2.5 px-4 bg-white rounded-2xl w-max border border-slate-200 shadow-sm font-semibold">
+                  <Loader2 className="h-4 w-4 animate-spin text-cyan-600" />
                   <span>AI is generating response & synthesizing speech audio...</span>
                 </div>
               )}
@@ -615,34 +619,34 @@ export default function VoiceChat({
 
         {/* Input Bar / Controls (HIDDEN when Session is Completed) */}
         {!isCompleted && (
-          <div className="p-4 border-t border-slate-800/80 bg-slate-950/90 space-y-3">
+          <div className="p-4 border-t border-slate-200/90 bg-white space-y-3">
             
             {/* Voice Microphone Recorder Controls */}
             {isVoiceMode && (
-              <div className="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+              <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200">
                 <div className="flex items-center space-x-3">
                   <button
                     type="button"
                     onClick={isRecording ? stopRecording : startRecording}
                     disabled={isProcessingTurn || isPlayingAudio}
-                    className={`h-12 w-12 rounded-full flex items-center justify-center transition-all transform active:scale-95 shadow-xl ${
+                    className={`h-12 w-12 rounded-full flex items-center justify-center transition-all transform active:scale-95 shadow-xl cursor-pointer ${
                       isRecording
-                        ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-rose-500/50 ring-4 ring-rose-500/30'
-                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/30'
+                        ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-rose-500/40 ring-4 ring-rose-500/20'
+                        : 'bg-gradient-to-tr from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-cyan-500/30'
                     }`}
                   >
                     {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
                   </button>
 
                   <div>
-                    <div className="text-xs font-bold text-slate-200">
+                    <div className="text-xs font-extrabold text-slate-900">
                       {isRecording
                         ? `Recording Speech... (${recordingTime}s)`
                         : autoTalkMode
                         ? 'Auto-Silence VAD Active (Mic sends audio automatically when you pause)'
                         : 'Tap Microphone to Speak'}
                     </div>
-                    <div className="text-[11px] text-slate-400">
+                    <div className="text-[11px] text-slate-500 font-medium">
                       {isRecording
                         ? 'Speak your symptoms — audio will auto-send after 1.6s of silence'
                         : 'Sarvam AI multi-model Indic speech recognition'}
@@ -675,12 +679,12 @@ export default function VoiceChat({
                     ? 'Or type your symptoms here (Text Fallback)...'
                     : 'Type your message or answer here...'
                 }
-                className="flex-1 glass-input px-4 py-3 rounded-xl text-sm"
+                className="flex-1 glass-input px-4 py-3 rounded-2xl text-sm font-medium"
               />
               <button
                 type="submit"
                 disabled={!textInput.trim() || isProcessingTurn || isRecording}
-                className="px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-bold text-sm flex items-center space-x-1.5 transition-all"
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 disabled:opacity-40 text-white font-bold text-sm flex items-center space-x-1.5 transition-all shadow-md shadow-cyan-600/20 cursor-pointer"
               >
                 <span>Send</span>
                 <Send className="h-4 w-4" />

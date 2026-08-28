@@ -38,24 +38,24 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-      <div className="glass-card rounded-2xl max-w-xl w-full p-6 border border-slate-800 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+      <div className="glass-card rounded-3xl max-w-xl w-full p-6 border border-slate-200/90 bg-white/95 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
         
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800 transition-all"
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-all"
         >
           <X className="h-5 w-5" />
         </button>
 
         <div className="mb-6">
-          <div className="inline-flex items-center space-x-2 px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-xs font-semibold mb-2">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-100 text-cyan-800 text-xs font-bold mb-2 border border-cyan-200">
             <FileText className="h-3.5 w-3.5" />
             <span>Gemini Vision OCR & Medical Extractor</span>
           </div>
-          <h3 className="text-xl font-bold text-slate-100">Upload Medical Document</h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <h3 className="text-xl font-extrabold text-slate-900">Upload Medical Document</h3>
+          <p className="text-xs text-slate-600 mt-1 font-medium">
             Upload doctor's prescription, discharge summary, or lab result image to automatically extract active medications and allergies into this session.
           </p>
         </div>
@@ -63,7 +63,7 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
         {/* Upload Form */}
         {!uploadResult ? (
           <form onSubmit={handleUpload} className="space-y-4">
-            <div className="border-2 border-dashed border-slate-700 hover:border-cyan-500/50 rounded-xl p-6 text-center transition-all bg-slate-900/40">
+            <div className="border-2 border-dashed border-cyan-200 hover:border-cyan-500 rounded-2xl p-6 text-center transition-all bg-sky-50/50">
               <input
                 type="file"
                 accept="image/*,.pdf"
@@ -75,19 +75,19 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
                 htmlFor="medical-doc-input"
                 className="cursor-pointer flex flex-col items-center justify-center space-y-2"
               >
-                <div className="h-12 w-12 rounded-full bg-cyan-950 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                <div className="h-12 w-12 rounded-full bg-cyan-100 border border-cyan-200 flex items-center justify-center text-cyan-700">
                   <UploadCloud className="h-6 w-6" />
                 </div>
-                <div className="text-sm font-semibold text-slate-200">
+                <div className="text-sm font-bold text-slate-900">
                   {selectedFile ? selectedFile.name : 'Click or Drag prescription file here'}
                 </div>
-                <div className="text-xs text-slate-400">Supports PNG, JPG, WEBP or PDF (Max 10MB)</div>
+                <div className="text-xs text-slate-500 font-medium">Supports PNG, JPG, WEBP or PDF (Max 10MB)</div>
               </label>
             </div>
 
             {error && (
-              <div className="p-3 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs flex items-center space-x-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
                 <span>{error}</span>
               </div>
             )}
@@ -96,14 +96,14 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:bg-slate-800"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!selectedFile || isUploading}
-                className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center space-x-2 disabled:opacity-40 transition-all"
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center space-x-2 disabled:opacity-40 transition-all shadow-md shadow-cyan-600/20 cursor-pointer"
               >
                 {isUploading ? (
                   <>
@@ -119,34 +119,34 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
         ) : (
           /* Parsed Findings Results */
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center space-x-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center space-x-3">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0" />
               <div>
                 <div className="font-bold text-sm">Document Analyzed Successfully</div>
                 <div>{uploadResult.message}</div>
               </div>
             </div>
 
-            <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3 text-xs">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 text-xs">
               <div>
-                <span className="text-slate-400 font-medium">Document Type: </span>
-                <span className="text-cyan-300 font-bold capitalize">{uploadResult.document_type || 'Prescription'}</span>
+                <span className="text-slate-500 font-semibold">Document Type: </span>
+                <span className="text-cyan-900 font-bold capitalize">{uploadResult.document_type || 'Prescription'}</span>
               </div>
               <div>
-                <span className="text-slate-400 font-medium">Summary: </span>
-                <span className="text-slate-200">{uploadResult.summary}</span>
+                <span className="text-slate-500 font-semibold">Summary: </span>
+                <span className="text-slate-800 font-medium">{uploadResult.summary}</span>
               </div>
 
               {/* Medications Found */}
               {uploadResult.medications_found?.length > 0 && (
                 <div>
-                  <div className="font-semibold text-cyan-400 flex items-center space-x-1.5 mb-1">
-                    <Pill className="h-3.5 w-3.5" />
+                  <div className="font-bold text-cyan-800 flex items-center space-x-1.5 mb-1">
+                    <Pill className="h-3.5 w-3.5 text-cyan-600" />
                     <span>Medications Extracted:</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {uploadResult.medications_found.map((med, idx) => (
-                      <span key={idx} className="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/30 text-cyan-300 font-mono">
+                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-sky-100 border border-sky-200 text-sky-900 font-mono font-medium">
                         {med}
                       </span>
                     ))}
@@ -157,13 +157,13 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
               {/* Allergies Found */}
               {uploadResult.allergies_found?.length > 0 && (
                 <div>
-                  <div className="font-semibold text-rose-400 flex items-center space-x-1.5 mb-1">
-                    <ShieldAlert className="h-3.5 w-3.5" />
+                  <div className="font-bold text-rose-800 flex items-center space-x-1.5 mb-1">
+                    <ShieldAlert className="h-3.5 w-3.5 text-rose-600" />
                     <span>Allergies Flagged:</span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {uploadResult.allergies_found.map((alg, idx) => (
-                      <span key={idx} className="px-2 py-0.5 rounded bg-rose-950 border border-rose-500/30 text-rose-300 font-mono">
+                      <span key={idx} className="px-2 py-0.5 rounded-lg bg-rose-100 border border-rose-200 text-rose-800 font-mono font-medium">
                         {alg}
                       </span>
                     ))}
@@ -174,11 +174,11 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
               {/* Findings */}
               {uploadResult.findings?.length > 0 && (
                 <div>
-                  <div className="font-semibold text-slate-300 flex items-center space-x-1.5 mb-1">
-                    <Activity className="h-3.5 w-3.5 text-indigo-400" />
+                  <div className="font-bold text-slate-800 flex items-center space-x-1.5 mb-1">
+                    <Activity className="h-3.5 w-3.5 text-indigo-600" />
                     <span>Clinical Findings:</span>
                   </div>
-                  <ul className="list-disc list-inside text-slate-300 space-y-0.5 pl-1">
+                  <ul className="list-disc list-inside text-slate-800 space-y-0.5 pl-1 font-medium">
                     {uploadResult.findings.map((finding, idx) => (
                       <li key={idx}>{finding}</li>
                     ))}
@@ -190,7 +190,7 @@ export default function DocumentUploader({ sessionId, onClose, onDocumentUploade
             <div className="flex justify-end pt-2">
               <button
                 onClick={onClose}
-                className="px-5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs transition-all"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 text-white font-bold text-xs transition-all shadow-md shadow-cyan-600/20"
               >
                 Done & Continue Onboarding
               </button>
