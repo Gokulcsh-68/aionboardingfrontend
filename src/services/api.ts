@@ -1,7 +1,9 @@
 import { CategoryInfo, PatientInfo, VoiceTurnResult } from "../types/voice";
 import { DocumentExtractionResult, PatientOnboardingResult } from "../types/onboarding";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
+const envUrl = import.meta.env.VITE_API_BASE_URL;
+// Force relative /api proxy path to prevent direct browser cross-origin calls (which fail preflight 405)
+const API_BASE_URL = (envUrl && !envUrl.startsWith("http") ? envUrl : "/api").replace(/\/$/, "");
 
 export async function startVoiceOnboarding(
   patient: PatientInfo,
