@@ -14,7 +14,9 @@ const INDIAN_LANGUAGES = [
   { code: 'en-IN', name: 'English (Indian Accent)', flag: '🇮🇳' },
 ];
 
-export default function PatientSetupForm({ onSubmit, isLoading }) {
+export default function PatientSetupForm({ onStartSession, onSubmit, isLoading }) {
+  const submitHandler = onStartSession || onSubmit;
+
   const [formData, setFormData] = useState({
     patient_id: 'PAT-' + Math.floor(1000 + Math.random() * 9000),
     first_name: '',
@@ -59,10 +61,10 @@ export default function PatientSetupForm({ onSubmit, isLoading }) {
           language: langCode || prev.language,
         }));
 
-        if (autoStart && fn) {
-          onSubmit({
+        if (autoStart && fn && typeof submitHandler === 'function') {
+          submitHandler({
             patient: {
-              id: prev.patient_id,
+              id: 'PAT-' + Math.floor(1000 + Math.random() * 9000),
               name: (fn + ' ' + ln).trim(),
               first_name: fn,
               last_name: ln,
@@ -71,8 +73,9 @@ export default function PatientSetupForm({ onSubmit, isLoading }) {
               abha_id: abha_id || '',
               phone: phone || '',
             },
-            category: prev.category,
+            category: { type: 'general', code: 'general_medicine', name: 'General Medicine' },
             language: langCode || 'ta-IN',
+            mode: 'voice',
           });
         }
       }
@@ -96,10 +99,10 @@ export default function PatientSetupForm({ onSubmit, isLoading }) {
           language: event.data.language || prev.language,
         }));
 
-        if (event.data.autoStart || event.data.type === 'START_ONBOARDING') {
-          onSubmit({
+        if ((event.data.autoStart || event.data.type === 'START_ONBOARDING') && typeof submitHandler === 'function') {
+          submitHandler({
             patient: {
-              id: pData.id || prev.patient_id,
+              id: pData.id || 'PAT-' + Math.floor(1000 + Math.random() * 9000),
               name: (fn + ' ' + ln).trim(),
               first_name: fn,
               last_name: ln,
@@ -108,8 +111,9 @@ export default function PatientSetupForm({ onSubmit, isLoading }) {
               abha_id: pData.abha_id || '',
               phone: pData.phone || '',
             },
-            category: prev.category,
+            category: { type: 'general', code: 'general_medicine', name: 'General Medicine' },
             language: event.data.language || 'ta-IN',
+            mode: 'voice',
           });
         }
       }
@@ -127,21 +131,25 @@ export default function PatientSetupForm({ onSubmit, isLoading }) {
     e.preventDefault();
     if (!formData.first_name.trim()) return;
 
-    onSubmit({
-      patient: {
-        id: formData.patient_id,
-        name: (formData.first_name + ' ' + formData.last_name).trim(),
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        age: Number(formData.age),
-        gender: formData.gender,
-        abha_id: formData.abha_id,
-        phone: formData.phone,
-      },
-      category: formData.category,
-      language: formData.language,
-      mode: 'voice',
-    });
+    if (typeof submitHandler === 'function') {
+      submitHandler({
+        patient: {
+          id: formData.patient_id,
+          name: (formData.first_name + ' ' + formData.last_name).trim(),
+          first_name: formData.first_name,
+          last_name: formData.last_name,
+          age: Number(formData.age),
+          gender: formData.gender,
+          abha_id: formData.abha_id,
+          phone: formData.phone,
+        },
+        category: formData.category,
+        language: formData.language,
+        mode: 'voice',
+      });
+    } else {
+      console.error('No submit handler function passed to PatientSetupForm');
+    }
   };
 
   return (
