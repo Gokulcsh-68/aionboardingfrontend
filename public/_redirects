@@ -1,2 +1,3 @@
-/api/*  https://services-api.a2zhealth.in/onboarding/:splat  200!
-/*      /index.html                                          200
+/v1/*  https://services-api.a2zhealth.in/onboarding/v1/:splat  200!
+/health  https://services-api.a2zhealth.in/onboarding/health  200!
+/*  /index.html  200

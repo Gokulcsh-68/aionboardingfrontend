@@ -3,8 +3,14 @@
   command = "npm run build"
 
 [[redirects]]
-  from = "/api/*"
-  to = "https://services-api.a2zhealth.in/onboarding/:splat"
+  from = "/v1/*"
+  to = "https://services-api.a2zhealth.in/onboarding/v1/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/health"
+  to = "https://services-api.a2zhealth.in/onboarding/health"
   status = 200
   force = true
 
