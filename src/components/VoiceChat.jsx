@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Send, Volume2, VolumeX, FileText, CheckCircle2, Bot, User, Sparkles, Loader2, Radio, Zap } from 'lucide-react';
+import { Mic, MicOff, Send, Volume2, VolumeX, FileText, CheckCircle2, Bot, User, Sparkles, Loader2, Radio, Zap, Volume, MessageSquare } from 'lucide-react';
 import { resolveAudioUrl } from '../services/api';
 
 export default function VoiceChat({
@@ -16,8 +16,12 @@ export default function VoiceChat({
   const [textInput, setTextInput] = useState('');
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [autoTalkMode, setAutoTalkMode] = useState(true); // Hands-free continuous call mode
+  const [viewMode, setViewMode] = useState('audio_only'); // 'audio_only' or 'transcript'
   const [turnHistory, setTurnHistory] = useState([]);
   const [statusMessage, setStatusMessage] = useState('Idle');
+
+  // Session completion check
+  const isCompleted = Boolean(session?.completed || session?.stage === 'completed' || session?.stage === 'finished');
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -30,6 +34,7 @@ export default function VoiceChat({
   const audioContextRef = useRef(null);
   const autoTalkRef = useRef(autoTalkMode);
   const isRecordingRef = useRef(isRecording);
+  const isCompletedRef = useRef(isCompleted);
 
   // Keep refs in sync for callbacks
   useEffect(() => {
@@ -39,6 +44,16 @@ export default function VoiceChat({
   useEffect(() => {
     isRecordingRef.current = isRecording;
   }, [isRecording]);
+
+  useEffect(() => {
+    isCompletedRef.current = isCompleted;
+    if (isCompleted) {
+      setAutoTalkMode(false);
+      if (isRecordingRef.current) {
+        stopRecording();
+      }
+    }
+  }, [isCompleted]);
 
   // Clean up AudioContext & timers on unmount
   useEffect(() => {
@@ -57,8 +72,8 @@ export default function VoiceChat({
       setIsPlayingAudio(false);
       setStatusMessage('Finished speaking');
 
-      // Auto-start listening in Auto-Talk mode if session is in progress and user wasn't already recording
-      if (autoTalkRef.current && isVoiceMode && !isRecordingRef.current) {
+      // Auto-start listening in Auto-Talk mode if session is in progress and not completed
+      if (autoTalkRef.current && isVoiceMode && !isRecordingRef.current && !isCompletedRef.current) {
         setStatusMessage('Auto-listening...');
         setTimeout(() => {
           startRecording();
@@ -100,7 +115,7 @@ export default function VoiceChat({
 
   // Handle Audio Recording Start with Web Audio API Voice Activity Detection (VAD)
   const startRecording = async () => {
-    if (isRecordingRef.current) return;
+    if (isRecordingRef.current || isCompletedRef.current) return;
     try {
       audioChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -204,6 +219,7 @@ export default function VoiceChat({
 
   // Submit Turn (Voice Blob or Text Fallback)
   const processTurn = async (audioBlob = null, textFallback = null) => {
+    if (isCompletedRef.current) return;
     const userMessageText = textFallback || (audioBlob ? '🎤 Recorded Audio Response' : '');
     if (!userMessageText && !audioBlob) return;
 
@@ -234,6 +250,10 @@ export default function VoiceChat({
 
         setTurnHistory((prev) => [...prev, aiTurn]);
 
+        if (response.completed) {
+          setAutoTalkMode(false);
+        }
+
         if (response.audio_url) {
           playAudio(response.audio_url);
         } else if (autoTalkRef.current && !response.completed) {
@@ -248,7 +268,7 @@ export default function VoiceChat({
 
   const handleTextSubmit = (e) => {
     e.preventDefault();
-    if (!textInput.trim() || isProcessingTurn) return;
+    if (!textInput.trim() || isProcessingTurn || isCompleted) return;
     processTurn(null, textInput.trim());
   };
 
@@ -274,6 +294,10 @@ export default function VoiceChat({
     setStatusMessage('Audio paused');
   };
 
+  // Latest AI response for Voice-Only Call View
+  const lastAiTurn = turnHistory.filter((t) => t.sender === 'ai').slice(-1)[0];
+  const lastUserTurn = turnHistory.filter((t) => t.sender === 'user').slice(-1)[0];
+
   return (
     <div className="max-w-5xl mx-auto my-6 px-4">
       <div className="glass-card rounded-2xl border border-slate-800 shadow-2xl flex flex-col h-[720px] relative overflow-hidden">
@@ -292,6 +316,11 @@ export default function VoiceChat({
                 <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                   {session?.language || 'en-IN'}
                 </span>
+                {isCompleted && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Session Completed
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400">
                 Specialty: <span className="text-cyan-400 font-semibold">{session?.category?.name || 'General'}</span>
@@ -300,8 +329,29 @@ export default function VoiceChat({
           </div>
 
           <div className="flex items-center space-x-2">
+            {/* View Mode Toggle: Audio Only vs Full Transcript */}
+            {!isCompleted && (
+              <button
+                onClick={() => setViewMode(viewMode === 'audio_only' ? 'transcript' : 'audio_only')}
+                className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-300 flex items-center space-x-1.5 transition-all"
+                title="Toggle between Voice Call mode and Full Text Transcript"
+              >
+                {viewMode === 'audio_only' ? (
+                  <>
+                    <MessageSquare className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Show Transcript</span>
+                  </>
+                ) : (
+                  <>
+                    <Volume className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Audio Only View</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {/* Auto-Talk Continuous Mode Toggle */}
-            {isVoiceMode && (
+            {isVoiceMode && !isCompleted && (
               <button
                 onClick={() => setAutoTalkMode(!autoTalkMode)}
                 className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center space-x-1.5 transition-all ${
@@ -312,7 +362,7 @@ export default function VoiceChat({
                 title="Continuous hands-free conversation (Auto-listen & auto-send on silence)"
               >
                 <Zap className={`h-3.5 w-3.5 ${autoTalkMode ? 'text-emerald-400 animate-pulse' : ''}`} />
-                <span>Silence VAD Auto-Send: {autoTalkMode ? 'ON' : 'OFF'}</span>
+                <span>Hands-Free Auto-Talk: {autoTalkMode ? 'ON' : 'OFF'}</span>
               </button>
             )}
 
@@ -344,7 +394,12 @@ export default function VoiceChat({
         {/* Dynamic Voice Activity Bar */}
         <div className="px-4 py-2 bg-slate-950/60 border-b border-slate-900 flex items-center justify-between text-xs">
           <div className="flex items-center space-x-2">
-            {isPlayingAudio ? (
+            {isCompleted ? (
+              <div className="flex items-center space-x-2 text-emerald-400 font-semibold">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Onboarding Completed — Ready for EHR Submission</span>
+              </div>
+            ) : isPlayingAudio ? (
               <div className="flex items-center space-x-2 text-cyan-400">
                 <Volume2 className="h-4 w-4 animate-bounce" />
                 <span className="font-semibold">AI Assistant Speaking...</span>
@@ -352,7 +407,7 @@ export default function VoiceChat({
             ) : isRecording ? (
               <div className="flex items-center space-x-2 text-rose-400">
                 <Radio className="h-4 w-4 animate-pulse" />
-                <span className="font-semibold">Microphone Active — Speak Now ({recordingTime}s, auto-sends when you pause)</span>
+                <span className="font-semibold">Microphone Active — Speak Now ({recordingTime}s)</span>
               </div>
             ) : isProcessingTurn ? (
               <div className="flex items-center space-x-2 text-indigo-400">
@@ -372,154 +427,267 @@ export default function VoiceChat({
           </div>
         </div>
 
-        {/* Chat Turn History Message List */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          {turnHistory.map((turn) => {
-            const isAI = turn.sender === 'ai';
-            return (
-              <div
-                key={turn.id}
-                className={`flex items-start space-x-3 ${isAI ? 'justify-start' : 'justify-end'}`}
-              >
-                {isAI && (
-                  <div className="h-8 w-8 rounded-lg bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0 mt-1">
-                    <Bot className="h-4 w-4" />
-                  </div>
-                )}
+        {/* Main Content Area */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col justify-center items-center">
+          
+          {/* VIEW A: Completed Session Screen (Shows ONLY Review Button) */}
+          {isCompleted ? (
+            <div className="my-auto text-center max-w-lg p-8 rounded-2xl bg-slate-900/80 border border-emerald-500/30 shadow-2xl space-y-6">
+              <div className="h-20 w-20 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/40 shadow-xl shadow-emerald-500/10">
+                <CheckCircle2 className="h-10 w-10" />
+              </div>
+              <div>
+                <h3 className="text-2xl font-extrabold text-slate-100">Patient Intake Completed</h3>
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                  All clinical symptoms, medical history, and prescription findings have been gathered for <span className="text-cyan-300 font-bold">{session?.patient?.name}</span>.
+                </p>
+              </div>
 
+              {/* Single Primary Action Button */}
+              <div className="pt-4">
+                <button
+                  onClick={() => onCompleteSession(false)}
+                  className="w-full py-4 px-6 rounded-xl text-sm font-extrabold text-slate-950 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 hover:from-emerald-300 hover:to-cyan-300 shadow-2xl shadow-emerald-500/30 flex items-center justify-center space-x-2 transition-all transform active:scale-95"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span>Review Clinical Report & Confirm EHR Submission</span>
+                </button>
+              </div>
+            </div>
+          ) : viewMode === 'audio_only' ? (
+            /* VIEW B: Audio Only Call View (Pure Voice Interactive Orb) */
+            <div className="my-auto flex flex-col items-center justify-center text-center max-w-xl space-y-8 py-4">
+              
+              {/* Interactive 3D Glowing Voice Orb Visualizer */}
+              <div className="relative flex items-center justify-center">
                 <div
-                  className={`max-w-xl rounded-2xl p-4 text-sm leading-relaxed shadow-lg ${
-                    isAI
-                      ? 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none'
-                      : 'bg-gradient-to-r from-cyan-600 to-sky-600 text-slate-950 font-medium rounded-tr-none'
+                  className={`w-40 h-40 rounded-full flex items-center justify-center transition-all duration-500 ${
+                    isPlayingAudio
+                      ? 'bg-gradient-to-tr from-cyan-500 via-sky-400 to-indigo-500 animate-pulse shadow-2xl shadow-cyan-500/50 scale-105'
+                      : isRecording
+                      ? 'bg-gradient-to-tr from-rose-500 via-pink-500 to-red-500 animate-pulse shadow-2xl shadow-rose-500/50 scale-105'
+                      : isProcessingTurn
+                      ? 'bg-gradient-to-tr from-indigo-500 via-purple-500 to-sky-500 animate-spin shadow-2xl shadow-indigo-500/50'
+                      : 'bg-slate-900 border-2 border-slate-700 shadow-xl'
                   }`}
                 >
-                  {turn.patientTranscript && (
-                    <div className="mb-2 text-xs italic text-cyan-400 bg-slate-950/60 p-2 rounded-lg border border-cyan-500/20">
-                      <span className="font-bold">Recognized Patient Speech:</span> "{turn.patientTranscript}"
-                    </div>
-                  )}
-
-                  <p>{turn.text}</p>
-
-                  <div className="mt-2 flex items-center justify-between text-[10px] opacity-75">
-                    <span>{turn.timestamp}</span>
-
-                    {/* Audio Playback Button for AI Responses */}
-                    {isAI && turn.audioUrl && (
-                      <button
-                        onClick={() => (isPlayingAudio ? stopAudio() : playAudio(turn.audioUrl))}
-                        className="ml-2 px-2 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-cyan-300 flex items-center space-x-1 transition-all"
-                      >
-                        {isPlayingAudio ? (
-                          <>
-                            <VolumeX className="h-3 w-3 text-rose-400" />
-                            <span>Pause Audio</span>
-                          </>
-                        ) : (
-                          <>
-                            <Volume2 className="h-3 w-3 text-cyan-400" />
-                            <span>Replay Audio</span>
-                          </>
-                        )}
-                      </button>
+                  <div className="w-32 h-32 rounded-full bg-slate-950/90 flex items-center justify-center">
+                    {isPlayingAudio ? (
+                      <Volume2 className="h-12 w-12 text-cyan-400 animate-bounce" />
+                    ) : isRecording ? (
+                      <Mic className="h-12 w-12 text-rose-400 animate-pulse" />
+                    ) : isProcessingTurn ? (
+                      <Loader2 className="h-12 w-12 text-indigo-400 animate-spin" />
+                    ) : (
+                      <Bot className="h-12 w-12 text-cyan-400" />
                     )}
                   </div>
                 </div>
 
-                {!isAI && (
-                  <div className="h-8 w-8 rounded-lg bg-sky-500 flex items-center justify-center text-slate-950 font-bold shrink-0 mt-1">
-                    <User className="h-4 w-4" />
-                  </div>
+                {/* Animated Ripple Waves */}
+                {(isPlayingAudio || isRecording) && (
+                  <>
+                    <div className="absolute inset-0 rounded-full border-2 border-cyan-400/40 animate-ping" />
+                    <div className="absolute -inset-4 rounded-full border border-cyan-400/20 animate-pulse" />
+                  </>
                 )}
               </div>
-            );
-          })}
 
-          {/* Turn Processing Loader */}
-          {isProcessingTurn && (
-            <div className="flex items-center space-x-3 text-slate-400 text-xs py-2 px-4 bg-slate-900/50 rounded-xl w-max border border-slate-800">
-              <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-              <span>AI is generating response & synthesizing speech audio...</span>
-            </div>
-          )}
-
-          <div ref={chatBottomRef} />
-        </div>
-
-        {/* Input Bar / Speech Control Controls */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/90 space-y-3">
-          
-          {/* Voice Microphone Recorder Controls */}
-          {isVoiceMode && (
-            <div className="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-slate-800">
-              <div className="flex items-center space-x-3">
-                <button
-                  type="button"
-                  onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isProcessingTurn || isPlayingAudio}
-                  className={`h-12 w-12 rounded-full flex items-center justify-center transition-all transform active:scale-95 shadow-xl ${
-                    isRecording
-                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-rose-500/50 ring-4 ring-rose-500/30'
-                      : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/30'
-                  }`}
-                >
-                  {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-                </button>
-
-                <div>
-                  <div className="text-xs font-bold text-slate-200">
-                    {isRecording
-                      ? `Recording Speech... (${recordingTime}s)`
-                      : autoTalkMode
-                      ? 'Auto-Silence VAD Active (Mic sends audio automatically when you pause speaking)'
-                      : 'Tap Microphone to Speak'}
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    {isRecording
-                      ? 'Speak your symptoms — audio will auto-send after 1.6s of silence'
-                      : 'Sarvam AI multi-model Indic speech recognition'}
-                  </div>
+              {/* Status Header */}
+              <div>
+                <div className="text-lg font-extrabold text-slate-100">
+                  {isPlayingAudio
+                    ? 'AI Doctor Speaking...'
+                    : isRecording
+                    ? 'Listening to Patient...'
+                    : isProcessingTurn
+                    ? 'Thinking & Processing...'
+                    : 'Voice Onboarding Call'}
                 </div>
+                <p className="text-xs text-slate-400 mt-1 max-w-md">
+                  {isPlayingAudio
+                    ? 'Listen to spoken instructions via audio output'
+                    : isRecording
+                    ? 'Speak your symptoms into microphone'
+                    : 'Hands-free automated clinical intake session'}
+                </p>
               </div>
 
-              {/* Animated Waveform Bars when Recording */}
-              {isRecording && (
-                <div className="flex items-center space-x-1 px-4">
-                  <div className="wave-bar" />
-                  <div className="wave-bar" />
-                  <div className="wave-bar" />
-                  <div className="wave-bar" />
-                  <div className="wave-bar" />
+              {/* Spoken AI Audio Controls */}
+              {lastAiTurn && (
+                <div className="w-full bg-slate-900/80 p-4 rounded-2xl border border-slate-800 space-y-2 text-left">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-cyan-400 flex items-center space-x-1.5">
+                      <Bot className="h-4 w-4" />
+                      <span>Current AI Question:</span>
+                    </span>
+                    {lastAiTurn.audioUrl && (
+                      <button
+                        onClick={() => (isPlayingAudio ? stopAudio() : playAudio(lastAiTurn.audioUrl))}
+                        className="px-2.5 py-1 rounded-lg bg-cyan-950 border border-cyan-500/30 text-cyan-300 font-semibold text-[11px] flex items-center space-x-1"
+                      >
+                        {isPlayingAudio ? <VolumeX className="h-3.5 w-3.5 text-rose-400" /> : <Volume2 className="h-3.5 w-3.5 text-cyan-400" />}
+                        <span>{isPlayingAudio ? 'Pause Voice' : 'Replay Voice'}</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-200 leading-relaxed font-medium">"{lastAiTurn.text}"</p>
                 </div>
               )}
             </div>
+          ) : (
+            /* VIEW C: Full Detailed Text Transcript */
+            <div className="w-full flex-1 overflow-y-auto space-y-4 pr-1">
+              {turnHistory.map((turn) => {
+                const isAI = turn.sender === 'ai';
+                return (
+                  <div
+                    key={turn.id}
+                    className={`flex items-start space-x-3 ${isAI ? 'justify-start' : 'justify-end'}`}
+                  >
+                    {isAI && (
+                      <div className="h-8 w-8 rounded-lg bg-cyan-950 border border-cyan-500/40 flex items-center justify-center text-cyan-400 shrink-0 mt-1">
+                        <Bot className="h-4 w-4" />
+                      </div>
+                    )}
+
+                    <div
+                      className={`max-w-xl rounded-2xl p-4 text-sm leading-relaxed shadow-lg ${
+                        isAI
+                          ? 'bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none'
+                          : 'bg-gradient-to-r from-cyan-600 to-sky-600 text-slate-950 font-medium rounded-tr-none'
+                      }`}
+                    >
+                      {turn.patientTranscript && (
+                        <div className="mb-2 text-xs italic text-cyan-400 bg-slate-950/60 p-2 rounded-lg border border-cyan-500/20">
+                          <span className="font-bold">Recognized Patient Speech:</span> "{turn.patientTranscript}"
+                        </div>
+                      )}
+
+                      <p>{turn.text}</p>
+
+                      <div className="mt-2 flex items-center justify-between text-[10px] opacity-75">
+                        <span>{turn.timestamp}</span>
+
+                        {/* Audio Playback Button for AI Responses */}
+                        {isAI && turn.audioUrl && (
+                          <button
+                            onClick={() => (isPlayingAudio ? stopAudio() : playAudio(turn.audioUrl))}
+                            className="ml-2 px-2 py-0.5 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/30 text-cyan-300 flex items-center space-x-1 transition-all"
+                          >
+                            {isPlayingAudio ? (
+                              <>
+                                <VolumeX className="h-3 w-3 text-rose-400" />
+                                <span>Pause Audio</span>
+                              </>
+                            ) : (
+                              <>
+                                <Volume2 className="h-3 w-3 text-cyan-400" />
+                                <span>Replay Audio</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {!isAI && (
+                      <div className="h-8 w-8 rounded-lg bg-sky-500 flex items-center justify-center text-slate-950 font-bold shrink-0 mt-1">
+                        <User className="h-4 w-4" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {isProcessingTurn && (
+                <div className="flex items-center space-x-3 text-slate-400 text-xs py-2 px-4 bg-slate-900/50 rounded-xl w-max border border-slate-800">
+                  <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
+                  <span>AI is generating response & synthesizing speech audio...</span>
+                </div>
+              )}
+
+              <div ref={chatBottomRef} />
+            </div>
           )}
 
-          {/* Text Input Fallback Form */}
-          <form onSubmit={handleTextSubmit} className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              disabled={isProcessingTurn || isRecording}
-              placeholder={
-                isVoiceMode
-                  ? 'Or type your symptoms here (Text Fallback)...'
-                  : 'Type your message or answer here...'
-              }
-              className="flex-1 glass-input px-4 py-3 rounded-xl text-sm"
-            />
-            <button
-              type="submit"
-              disabled={!textInput.trim() || isProcessingTurn || isRecording}
-              className="px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-bold text-sm flex items-center space-x-1.5 transition-all"
-            >
-              <span>Send</span>
-              <Send className="h-4 w-4" />
-            </button>
-          </form>
         </div>
+
+        {/* Input Bar / Controls (HIDDEN when Session is Completed) */}
+        {!isCompleted && (
+          <div className="p-4 border-t border-slate-800/80 bg-slate-950/90 space-y-3">
+            
+            {/* Voice Microphone Recorder Controls */}
+            {isVoiceMode && (
+              <div className="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                <div className="flex items-center space-x-3">
+                  <button
+                    type="button"
+                    onClick={isRecording ? stopRecording : startRecording}
+                    disabled={isProcessingTurn || isPlayingAudio}
+                    className={`h-12 w-12 rounded-full flex items-center justify-center transition-all transform active:scale-95 shadow-xl ${
+                      isRecording
+                        ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-rose-500/50 ring-4 ring-rose-500/30'
+                        : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/30'
+                    }`}
+                  >
+                    {isRecording ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                  </button>
+
+                  <div>
+                    <div className="text-xs font-bold text-slate-200">
+                      {isRecording
+                        ? `Recording Speech... (${recordingTime}s)`
+                        : autoTalkMode
+                        ? 'Auto-Silence VAD Active (Mic sends audio automatically when you pause)'
+                        : 'Tap Microphone to Speak'}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {isRecording
+                        ? 'Speak your symptoms — audio will auto-send after 1.6s of silence'
+                        : 'Sarvam AI multi-model Indic speech recognition'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Animated Waveform Bars when Recording */}
+                {isRecording && (
+                  <div className="flex items-center space-x-1 px-4">
+                    <div className="wave-bar" />
+                    <div className="wave-bar" />
+                    <div className="wave-bar" />
+                    <div className="wave-bar" />
+                    <div className="wave-bar" />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Text Input Fallback Form */}
+            <form onSubmit={handleTextSubmit} className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                disabled={isProcessingTurn || isRecording}
+                placeholder={
+                  isVoiceMode
+                    ? 'Or type your symptoms here (Text Fallback)...'
+                    : 'Type your message or answer here...'
+                }
+                className="flex-1 glass-input px-4 py-3 rounded-xl text-sm"
+              />
+              <button
+                type="submit"
+                disabled={!textInput.trim() || isProcessingTurn || isRecording}
+                className="px-5 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-slate-950 font-bold text-sm flex items-center space-x-1.5 transition-all"
+              >
+                <span>Send</span>
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
+        )}
 
       </div>
     </div>
