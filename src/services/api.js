@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+// Force relative paths on Netlify to route through Netlify proxy and eliminate CORS errors
+const isNetlify = typeof window !== 'undefined' && window.location.hostname.includes('netlify.app');
+const API_BASE_URL = isNetlify ? '' : (import.meta.env.VITE_API_BASE_URL || '');
 
 /**
  * Health check endpoint ping
