@@ -131,7 +131,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-cyan-500 selection:text-slate-900">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-50 via-sky-50 to-indigo-50 text-slate-900 selection:bg-cyan-500 selection:text-white">
       
       {/* Header Bar */}
       <Header
@@ -182,7 +182,7 @@ export default function App() {
       )}
 
       {/* Footer */}
-      <footer className="py-4 border-t border-slate-900 text-center text-xs text-slate-400 font-medium">
+      <footer className="py-4 border-t border-slate-200/80 text-center text-xs text-slate-500 font-medium bg-white/60 backdrop-blur-md">
         CureSelect Healthcare AI Engine • Powered by Sarvam AI, OpenAI GPT-4o, Claude 3.5 Sonnet & Gemini 1.5 Flash Vision
       </footer>
 
