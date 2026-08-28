@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Send, Volume2, VolumeX, FileText, CheckCircle2, Bot, User, Sparkles, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Send, Volume2, VolumeX, FileText, CheckCircle2, Bot, User, Sparkles, Loader2, Radio, Zap } from 'lucide-react';
 import { resolveAudioUrl } from '../services/api';
 
 export default function VoiceChat({
@@ -15,13 +15,49 @@ export default function VoiceChat({
   const [recordingTime, setRecordingTime] = useState(0);
   const [textInput, setTextInput] = useState('');
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [autoTalkMode, setAutoTalkMode] = useState(true); // Hands-free continuous call mode
   const [turnHistory, setTurnHistory] = useState([]);
+  const [statusMessage, setStatusMessage] = useState('Idle');
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const timerRef = useRef(null);
   const audioPlayerRef = useRef(new Audio());
   const chatBottomRef = useRef(null);
+  const autoTalkRef = useRef(autoTalkMode);
+  const isRecordingRef = useRef(isRecording);
+
+  // Keep refs in sync for event listeners
+  useEffect(() => {
+    autoTalkRef.current = autoTalkMode;
+  }, [autoTalkMode]);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
+  // Audio Playback Listener setup
+  useEffect(() => {
+    const audioEl = audioPlayerRef.current;
+
+    const handleEnded = () => {
+      setIsPlayingAudio(false);
+      setStatusMessage('Finished speaking');
+
+      // Auto-start listening in Auto-Talk mode if session is in progress and user wasn't already recording
+      if (autoTalkRef.current && isVoiceMode && !isRecordingRef.current) {
+        setStatusMessage('Auto-listening...');
+        setTimeout(() => {
+          startRecording();
+        }, 500);
+      }
+    };
+
+    audioEl.addEventListener('ended', handleEnded);
+    return () => {
+      audioEl.removeEventListener('ended', handleEnded);
+    };
+  }, [isVoiceMode]);
 
   // Initialize turn history ONLY when session_id changes (new session initialized)
   useEffect(() => {
@@ -47,10 +83,11 @@ export default function VoiceChat({
   // Scroll chat to bottom on updates
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [turnHistory, isProcessingTurn]);
+  }, [turnHistory, isProcessingTurn, isPlayingAudio, isRecording]);
 
   // Handle Audio Recording Start
   const startRecording = async () => {
+    if (isRecordingRef.current) return;
     try {
       audioChunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -73,13 +110,14 @@ export default function VoiceChat({
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
+      setStatusMessage('Listening for your response...');
 
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (err) {
       console.warn('Microphone access unavailable or denied:', err);
-      alert('Microphone access permission was denied or unavailable. Please use the text fallback input below.');
+      setStatusMessage('Microphone access unavailable');
     }
   };
 
@@ -89,12 +127,13 @@ export default function VoiceChat({
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       clearInterval(timerRef.current);
+      setStatusMessage('Processing speech turn...');
     }
   };
 
   // Submit Turn (Voice Blob or Text Fallback)
   const processTurn = async (audioBlob = null, textFallback = null) => {
-    const userMessageText = textFallback || (audioBlob ? '🎤 Recorded Audio Turn' : '');
+    const userMessageText = textFallback || (audioBlob ? '🎤 Recorded Audio Response' : '');
     if (!userMessageText && !audioBlob) return;
 
     // Add user turn to state
@@ -126,6 +165,9 @@ export default function VoiceChat({
 
         if (response.audio_url) {
           playAudio(response.audio_url);
+        } else if (autoTalkRef.current && !response.completed) {
+          // If no audio returned, auto-start mic for next turn
+          setTimeout(() => startRecording(), 800);
         }
       }
     } catch (err) {
@@ -145,14 +187,11 @@ export default function VoiceChat({
     if (!fullUrl) return;
 
     try {
+      setStatusMessage('AI Speaking...');
       audioPlayerRef.current.pause();
       audioPlayerRef.current.src = fullUrl;
       audioPlayerRef.current.play().catch((e) => console.warn('Audio play autoplay blocked:', e));
       setIsPlayingAudio(true);
-
-      audioPlayerRef.current.onended = () => {
-        setIsPlayingAudio(false);
-      };
     } catch (e) {
       console.error('Audio playback failed:', e);
     }
@@ -161,11 +200,12 @@ export default function VoiceChat({
   const stopAudio = () => {
     audioPlayerRef.current.pause();
     setIsPlayingAudio(false);
+    setStatusMessage('Audio paused');
   };
 
   return (
     <div className="max-w-5xl mx-auto my-6 px-4">
-      <div className="glass-card rounded-2xl border border-slate-800 shadow-2xl flex flex-col h-[700px] relative overflow-hidden">
+      <div className="glass-card rounded-2xl border border-slate-800 shadow-2xl flex flex-col h-[720px] relative overflow-hidden">
         
         {/* Chat Header Bar */}
         <div className="p-4 border-b border-slate-800/80 bg-slate-900/60 flex items-center justify-between">
@@ -176,26 +216,42 @@ export default function VoiceChat({
             <div>
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-sm text-slate-100">
-                  {session?.patient?.name || 'Patient'} Onboarding Chat
+                  {session?.patient?.name || 'Patient'} Onboarding Assistant
                 </span>
                 <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                   {session?.language || 'en-IN'}
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Department: <span className="text-cyan-400 font-semibold">{session?.category?.name || 'General'}</span>
+                Specialty: <span className="text-cyan-400 font-semibold">{session?.category?.name || 'General'}</span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
+            {/* Auto-Talk Continuous Mode Toggle */}
+            {isVoiceMode && (
+              <button
+                onClick={() => setAutoTalkMode(!autoTalkMode)}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center space-x-1.5 transition-all ${
+                  autoTalkMode
+                    ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 shadow-sm'
+                    : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+                title="Continuous hands-free conversation (Auto-listen when AI stops talking)"
+              >
+                <Zap className={`h-3.5 w-3.5 ${autoTalkMode ? 'text-emerald-400 animate-pulse' : ''}`} />
+                <span>Hands-Free Auto-Talk: {autoTalkMode ? 'ON' : 'OFF'}</span>
+              </button>
+            )}
+
             {/* Document Uploader Trigger */}
             <button
               onClick={onOpenDocumentUploader}
               className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold text-slate-200 flex items-center space-x-1.5 transition-all"
             >
               <FileText className="h-3.5 w-3.5 text-cyan-400" />
-              <span>Attach Prescription</span>
+              <span>Prescription OCR</span>
               {documentsCount > 0 && (
                 <span className="ml-1 px-1.5 py-0.2 rounded-full bg-cyan-500 text-slate-950 font-mono text-[10px]">
                   {documentsCount}
@@ -209,8 +265,39 @@ export default function VoiceChat({
               className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 text-xs font-extrabold flex items-center space-x-1.5 shadow-lg shadow-emerald-500/20 transition-all"
             >
               <CheckCircle2 className="h-4 w-4" />
-              <span>Review & Submit to EHR</span>
+              <span>Review & Submit EHR</span>
             </button>
+          </div>
+        </div>
+
+        {/* Dynamic Voice Activity Bar */}
+        <div className="px-4 py-2 bg-slate-950/60 border-b border-slate-900 flex items-center justify-between text-xs">
+          <div className="flex items-center space-x-2">
+            {isPlayingAudio ? (
+              <div className="flex items-center space-x-2 text-cyan-400">
+                <Volume2 className="h-4 w-4 animate-bounce" />
+                <span className="font-semibold">AI Assistant Speaking...</span>
+              </div>
+            ) : isRecording ? (
+              <div className="flex items-center space-x-2 text-rose-400">
+                <Radio className="h-4 w-4 animate-pulse" />
+                <span className="font-semibold">Microphone Active — Speak Now ({recordingTime}s)</span>
+              </div>
+            ) : isProcessingTurn ? (
+              <div className="flex items-center space-x-2 text-indigo-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="font-semibold">Analyzing Symptoms & Synthesizing Reply...</span>
+              </div>
+            ) : (
+              <div className="flex items-center space-x-2 text-slate-400">
+                <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Ready for turn</span>
+              </div>
+            )}
+          </div>
+
+          <div className="text-[11px] font-mono text-slate-400">
+            Session: <span className="text-cyan-300">{session?.session_id}</span>
           </div>
         </div>
 
@@ -238,7 +325,7 @@ export default function VoiceChat({
                 >
                   {turn.patientTranscript && (
                     <div className="mb-2 text-xs italic text-cyan-400 bg-slate-950/60 p-2 rounded-lg border border-cyan-500/20">
-                      <span className="font-bold">Recognized Speech:</span> "{turn.patientTranscript}"
+                      <span className="font-bold">Recognized Patient Speech:</span> "{turn.patientTranscript}"
                     </div>
                   )}
 
@@ -256,12 +343,12 @@ export default function VoiceChat({
                         {isPlayingAudio ? (
                           <>
                             <VolumeX className="h-3 w-3 text-rose-400" />
-                            <span>Stop TTS</span>
+                            <span>Pause Audio</span>
                           </>
                         ) : (
                           <>
                             <Volume2 className="h-3 w-3 text-cyan-400" />
-                            <span>Listen Audio</span>
+                            <span>Replay Audio</span>
                           </>
                         )}
                       </button>
@@ -282,7 +369,7 @@ export default function VoiceChat({
           {isProcessingTurn && (
             <div className="flex items-center space-x-3 text-slate-400 text-xs py-2 px-4 bg-slate-900/50 rounded-xl w-max border border-slate-800">
               <Loader2 className="h-4 w-4 animate-spin text-cyan-400" />
-              <span>AI is analyzing clinical response & generating TTS audio...</span>
+              <span>AI is generating response & synthesizing speech audio...</span>
             </div>
           )}
 
@@ -299,10 +386,10 @@ export default function VoiceChat({
                 <button
                   type="button"
                   onClick={isRecording ? stopRecording : startRecording}
-                  disabled={isProcessingTurn}
+                  disabled={isProcessingTurn || isPlayingAudio}
                   className={`h-12 w-12 rounded-full flex items-center justify-center transition-all transform active:scale-95 shadow-xl ${
                     isRecording
-                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-rose-500/50'
+                      ? 'bg-rose-500 hover:bg-rose-600 text-white animate-pulse shadow-rose-500/50 ring-4 ring-rose-500/30'
                       : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-cyan-500/30'
                   }`}
                 >
@@ -311,11 +398,15 @@ export default function VoiceChat({
 
                 <div>
                   <div className="text-xs font-bold text-slate-200">
-                    {isRecording ? `Recording Speech... (${recordingTime}s)` : 'Tap Microphone to Speak'}
+                    {isRecording
+                      ? `Recording Speech... (${recordingTime}s)`
+                      : autoTalkMode
+                      ? 'Hands-Free Auto-Talk Active (Mic opens when AI stops talking)'
+                      : 'Tap Microphone to Speak'}
                   </div>
                   <div className="text-[11px] text-slate-400">
                     {isRecording
-                      ? 'Release or tap again to stop and submit'
+                      ? 'Tap again or wait to stop and auto-submit turn'
                       : 'Sarvam AI multi-model Indic speech recognition'}
                   </div>
                 </div>
